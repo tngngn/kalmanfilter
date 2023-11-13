@@ -9,88 +9,81 @@ true_states = np.stack((true_xs,true_ys), axis=1)
 
 # Linear stochastic difference
 x_0, y_0 = 0, 0 
-motion_states = [np.array([x_0, y_0])] 
+mo_states = [np.array([x_0, y_0])] 
 u_t = np.array([1.0, 1.0]) 
 A = np.array([[1, 0],
               [0, 1]])
 B = np.array([[1, 0],
               [0, 1]])
-Q = np.array([[0.65, 0],
-              [0, 0.75]]) 
+Q = np.array([[1, 0],
+              [0, 1]]) 
 for _ in range(10):
-    motion_noise = np.random.multivariate_normal(mean=np.array([0,0]), cov=Q) 
-    new_state = A @ motion_states[-1] + B @ u_t + motion_noise 
-    motion_states.append(new_state)
+    mo_noise = np.random.multivariate_normal(mean=np.array([0,0]), cov=Q) 
+    new_state = A @ mo_states[-1] + B @ u_t + mo_noise 
+    mo_states.append(new_state)
 
 # Measurements 
-measurement_states = [np.array([x_0, y_0])] 
+me_states = [np.array([x_0, y_0])] 
 H = np.array([[1, 0],
               [0, 1]]) 
-R = np.array([[0.05, 0],
-              [0, 0.02]]) 
+R = np.array([[0.5, 0],
+              [0, 0.5]]) 
 for i in range(10):
-    measurement_noise = np.random.multivariate_normal(mean=np.array([0,0]), cov=R) 
-    new_measurement = H @ true_states[i+1] + measurement_noise 
-    measurement_states.append(new_measurement)
+    me_noise = np.random.multivariate_normal(mean=np.array([0,0]), cov=R) 
+    new_me = H @ true_states[i+1] + me_noise 
+    me_states.append(new_me)
 
-motion_states = np.array(motion_states)
-measurement_states = np.array(measurement_states)
+mo_states = np.array(mo_states)
+me_states = np.array(me_states)
 
 # Init
 mu_0 = np.array([0, 0])
-Sigma_0 = np.array([[0.1, 0],
+sig_0 = np.array([[0.1, 0],
                      [0, 0.1]])
 u_t = np.array([1, 1]) 
-A = np.array([[1, 0],
-              [0, 1]])
-B = np.array([[1, 0],
-              [0, 1]])
-Q = np.array([[0.3, 0],
-              [0, 0.3]])
-H = np.array([[1, 0],
-              [0, 1]])
-R = np.array([[0.75, 0],
-              [0, 0.6]])
 
-measurement_states = []
-filtered_states = []
+me_states = []
+fil_states = []
 
-def predict(A, B, Q, u_k, mu_k, Sigma_k):
-    predicted_mu = A @ mu_k + B @ u_k
-    predicted_Sigma = A @ Sigma_k @ A.T + Q
-    return predicted_mu, predicted_Sigma
+def predict(A, B, Q, u_k, mu_k, sig_k):
+    pred_mu = A @ mu_k + B @ u_k
+    pred_sig = A @ sig_k @ A.T + Q
+    return pred_mu, pred_sig
 
-def update(H, R, z, predicted_mu, predicted_Sigma):
-    residual_mean = z - H @ predicted_mu
-    residual_covariance = H @ predicted_Sigma @ H.T + R
-    kalman_gain = predicted_Sigma @ H.T @ np.linalg.inv(residual_covariance)
-    updated_mu = predicted_mu + kalman_gain @ residual_mean
-    updated_Sigma = predicted_Sigma - kalman_gain @ H @ predicted_Sigma
-    return updated_mu, updated_Sigma
+def update(H, R, z, pred_mu, pred_sig):
+    resi_mean = z - H @ pred_mu
+    resi_cov = H @ pred_sig @ H.T + R
+    kalman_gain = pred_sig @ H.T @ np.linalg.inv(resi_cov)
+    upd_mu = pred_mu + kalman_gain @ resi_mean
+    upd_sig = pred_sig - kalman_gain @ H @ pred_sig
+    return upd_mu, upd_sig
 
 # Kalman filter
-mu_current = mu_0.copy()
-Sigma_current = Sigma_0.copy()
+mu_cur = mu_0.copy()
+sig_cur = sig_0.copy()
 for i in range(num_steps):
     # Predict
-    predicted_mu, predicted_Sigma = predict(A, B, Q, u_t, mu_current, Sigma_current)
+    pred_mu, pred_sig = predict(A, B, Q, u_t, mu_cur, sig_cur)
     # Measurement 
-    measurement_noise = np.random.multivariate_normal(mean=np.array([0,0]), cov=R) # ~N(0,R)
-    new_measurement = H @ true_states[i+1] + measurement_noise # this is z_t
+    me_noise = np.random.multivariate_normal(mean=np.array([0,0]), cov=R) 
+    new_me = H @ true_states[i+1] + me_noise 
     # Update
-    mu_current, Sigma_current = update(H, R, new_measurement, predicted_mu, predicted_Sigma)
+    mu_cur, sig_cur = update(H, R, new_me, pred_mu, pred_sig)
     # Store
-    measurement_states.append(new_measurement)
-    filtered_states.append(mu_current)
+    me_states.append(new_me)
+    fil_states.append(mu_cur)
 
-measurement_states = np.array(measurement_states)
-filtered_states = np.array(filtered_states)
+me_states = np.array(me_states)
+fil_states = np.array(fil_states)
 
 # Results
+
+
 plt.plot(true_states[:,0], true_states[:,1]) 
-plt.plot(motion_states[:,0], motion_states[:,1]) 
-plt.plot(measurement_states[:,0], measurement_states[:,1])
-plt.plot(filtered_states[:,0], filtered_states[:,1])
+plt.plot(mo_states[:,0], mo_states[:,1]) 
+plt.plot(me_states[:,0], me_states[:,1])
+plt.plot(fil_states[:,0], fil_states[:,1])
+plt.plot(me_states,'k+',label='Measurements')
 plt.xlim(-1,12)
 plt.ylim(-1,12)
 plt.xlabel('x position')
